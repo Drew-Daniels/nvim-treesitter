@@ -15,7 +15,15 @@ local function check_exe(name)
   if vim.fn.executable(name) == 1 then
     local path = vim.fn.exepath(name)
     local out = vim.trim(vim.fn.system({ name, '--version' }))
+    -- vim.version.parse() can fail on prefixed version strings (e.g. "curl 8.7.1")
+    -- Try the raw output first, then attempt to extract a semver-like substring
     local version = vim.version.parse(out)
+    if not version then
+      local ver_str = out:match('%d+%.%d+%.%d+[%w%-%.]*') or out:match('%d+%.%d+[%w%-%.]*')
+      if ver_str then
+        version = vim.version.parse(ver_str)
+      end
+    end
     return { path = path, version = version, out = out }
   end
 end
@@ -26,6 +34,8 @@ local function install_health()
   do -- nvim check
     if vim.fn.has('nvim-0.12') ~= 1 then
       health.error('Nvim-treesitter requires Neovim 0.12.0 or later.')
+    else
+      health.ok('Neovim ' .. tostring(vim.version()))
     end
 
     if vim.treesitter.language_version >= NVIM_TREESITTER_MINIMUM_ABI then
@@ -53,7 +63,9 @@ local function install_health()
   do -- treesitter check
     local ts = check_exe('tree-sitter')
     if ts then
-      if vim.version.ge(ts.version, TREE_SITTER_MIN_VER) then
+      if not ts.version then
+        health.warn(string.format('tree-sitter-cli found (%s) but could not parse version: %s', ts.path, ts.out))
+      elseif vim.version.ge(ts.version, TREE_SITTER_MIN_VER) then
         health.ok(string.format('tree-sitter-cli %s (%s)', ts.version, ts.path))
       else
         health.error(
@@ -68,14 +80,14 @@ local function install_health()
   do -- curl+tar check
     local tar = check_exe('tar')
     if tar then
-      health.ok(string.format('tar %s (%s)', tar.version, tar.path))
+      health.ok(string.format('tar %s (%s)', tar.version or tar.out, tar.path))
     else
       health.error('tar not found')
     end
 
     local curl = check_exe('curl')
     if curl then
-      health.ok(string.format('curl %s (%s)\n%s', curl.version, curl.path, curl.out))
+      health.ok(string.format('curl %s (%s)\n%s', curl.version or '(unknown)', curl.path, curl.out))
     else
       health.error('curl not found')
     end

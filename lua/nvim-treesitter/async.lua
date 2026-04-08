@@ -1,4 +1,6 @@
 ---@meta nvim-treesitter.async vendored file, don't diagnose
+--- NOTE: Neovim 0.13+ exposes vim._async internally. When it becomes a stable
+--- public API (vim.async), this vendored module should be replaced with it.
 local pcall = copcall or pcall
 
 --- @param ... any

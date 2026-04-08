@@ -116,9 +116,15 @@ function M.get_indent(lnum)
     return -1
   end
 
-  parser:parse({ vim.fn.line('w0') - 1, vim.fn.line('w$') })
+  -- parse() with a range still works synchronously when no callback is provided.
+  -- Wrap in pcall to guard against any future API changes.
+  local parse_ok, trees = pcall(parser.parse, parser, { vim.fn.line('w0') - 1, vim.fn.line('w$') })
+  if not parse_ok or not trees then
+    return -1
+  end
 
-  -- Get language tree with smallest range around node that's not a comment parser
+  -- Get language tree with smallest range around node that's not a comment parser.
+  -- for_each_tree callback: (tstree: TSTree, ltree: LanguageTree)
   local root, lang_tree ---@type TSNode, vim.treesitter.LanguageTree
   parser:for_each_tree(function(tstree, tree)
     if not tstree or M.comment_parsers[tree:lang()] then
